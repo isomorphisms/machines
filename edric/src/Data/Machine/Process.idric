@@ -46,9 +46,9 @@ echo {a} = Await Input (\input ⇒ Yield input echo) Stop
 
 ||| Emit a prefix, then pass the real input through.
 public export
-prepended : List a → Process a a
-prepended [] = echo
-prepended (output :: rest) = Yield output (prepended rest)
+prepended : {a : Type} → List a → Process a a
+prepended {a} [] = echo
+prepended {a} (output :: rest) = Yield output (prepended rest)
 
 ||| Pass only values satisfying the predicate.
 public export
