@@ -26,12 +26,29 @@ jobs:
           ref: 9b0bf7fa8be9483440e6ec0530f3aef3999a8735
           path: Idric
 
+      - name: Cache bootstrapped Idriç
+        id: idric-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            Idric/build
+            Idric/bootstrap-build
+            Idric/libs/prelude/build
+            Idric/libs/base/build
+            Idric/libs/linear/build
+            Idric/libs/network/build
+            Idric/libs/contrib/build
+            Idric/libs/test/build
+            Idric/libs/papers/build
+          key: idric-${{ runner.os }}-9b0bf7fa8be9483440e6ec0530f3aef3999a8735-v1
+
       - name: Install Chez Scheme
         run: |
           sudo apt-get update
           sudo apt-get install -y chezscheme
 
       - name: Bootstrap Idriç
+        if: steps.idric-cache.outputs.cache-hit != 'true'
         working-directory: Idric
         run: make bootstrap SCHEME=scheme
 
