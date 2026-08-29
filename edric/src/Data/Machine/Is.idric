@@ -1,0 +1,8 @@
+module Data.Machine.Is
+
+%default total
+
+||| A request family with exactly one possible input type.
+public export
+data Is : Type → Type → Type where
+  Input : Is a a

@@ -1,0 +1,188 @@
+module Data.Machine.Process
+
+import Data.Machine.Core
+import Data.Machine.Is
+
+%default partial
+
+||| A one-input stream transducer.
+public export
+Process : Type → Type → Type
+Process a b = Machine (Is a) b
+
+||| Feed outputs of any machine into a one-input process.
+public export
+pipe : Machine k a → Process a b → Machine k b
+pipe upstream Stop = Stop
+pipe upstream (Yield output rest) = Yield output (pipe upstream rest)
+pipe upstream (Await Input receive starved) =
+  case upstream of
+    Stop => pipe Stop starved
+    Yield input rest => pipe rest (receive input)
+    Await request receiveUpstream starvedUpstream =>
+      Await request
+            (\input => pipe (receiveUpstream input)
+                            (Await Input receive starved))
+            (pipe starvedUpstream (Await Input receive starved))
+
+infixl 9 ~>
+
+public export
+(~>) : Machine k a → Process a b → Machine k b
+(~>) = pipe
+
+||| Feed a finite list to a process and collect its output.
+public export
+run : List a → Process a b → List b
+run inputs Stop = []
+run inputs (Yield output rest) = output :: run inputs rest
+run [] (Await Input receive starved) = run [] starved
+run (input :: rest) (Await Input receive starved) = run rest (receive input)
+
+||| Pass every input through unchanged.
+public export
+echo : Process a a
+echo = Await Input (\input => Yield input echo) Stop
+
+||| Emit a prefix, then pass the real input through.
+public export
+prepended : List a → Process a a
+prepended [] = echo
+prepended (output :: rest) = Yield output (prepended rest)
+
+||| Pass only values satisfying the predicate.
+public export
+filtered : (a → Bool) → Process a a
+filtered predicate =
+  Await Input
+        (\input => if predicate input
+                     then Yield input (filtered predicate)
+                     else filtered predicate)
+        Stop
+
+||| Drop exactly the first n inputs.
+public export
+dropping : Nat → Process a a
+dropping Z = echo
+dropping (S n) = Await Input (\_ => dropping n) Stop
+
+||| Pass exactly the first n inputs, then stop.
+public export
+taking : Nat → Process a a
+taking Z = Stop
+taking (S n) = Await Input (\input => Yield input (taking n)) Stop
+
+||| Pass inputs while the predicate holds, then stop at the first failure.
+public export
+takingWhile : (a → Bool) → Process a a
+takingWhile predicate =
+  Await Input
+        (\input => if predicate input
+                     then Yield input (takingWhile predicate)
+                     else Stop)
+        Stop
+
+||| Unwrap Just values until the first Nothing.
+public export
+takingJusts : Process (Maybe a) a
+takingJusts =
+  Await Input
+        (\input => case input of
+                     Nothing => Stop
+                     Just value => Yield value takingJusts)
+        Stop
+
+||| Drop inputs while the predicate holds; pass the remainder unchanged.
+public export
+droppingWhile : (a → Bool) → Process a a
+droppingWhile predicate =
+  Await Input
+        (\input => if predicate input
+                     then droppingWhile predicate
+                     else Yield input echo)
+        Stop
+
+||| Chunk the input into non-empty lists. A final short chunk is emitted when
+||| the input starves. Nat rules out the Haskell version's negative sizes.
+public export
+buffered : Nat → Process a (List a)
+buffered Z = Stop
+buffered size@(S _) = gather [] size
+  where
+    gather : List a → Nat → Process a (List a)
+    gather [] Z = Stop
+    gather [] (S remaining) =
+      Await Input
+            (\input => gather [input] remaining)
+            Stop
+    gather acc Z = Yield (reverse acc) (gather [] size)
+    gather acc (S remaining) =
+      Await Input
+            (\input => gather (input :: acc) remaining)
+            (Yield (reverse acc) Stop)
+
+||| Left scan. Like Kmett's scan, the seed is emitted before any input.
+public export
+scan : (state → input → state) → state → Process input state
+scan step state =
+  Yield state
+        (Await Input
+               (\input => scan step (step state input))
+               Stop)
+
+||| Left scan using the first input as the seed.
+public export
+scan1 : (a → a → a) → Process a a
+scan1 step = Await Input (\first => scan step first) Stop
+
+||| Left fold, emitting only the final state when input ends.
+public export
+fold : (state → input → state) → state → Process input state
+fold step state =
+  Await Input
+        (\input => fold step (step state input))
+        (Yield state Stop)
+
+||| Left fold using the first input as the seed.
+public export
+fold1 : (a → a → a) → Process a a
+fold1 step = Await Input (\first => finish first) Stop
+  where
+    finish : a → Process a a
+    finish state =
+      Await Input
+            (\input => finish (step state input))
+            (Yield state Stop)
+
+||| Map one pure function over all input values.
+public export
+mapping : (a → b) → Process a b
+mapping transform =
+  Await Input
+        (\input => Yield (transform input) (mapping transform))
+        Stop
+
+||| Flatten list-valued inputs.
+public export
+flattened : Process (List a) a
+flattened = Await Input emitAll Stop
+  where
+    emitAll : List a → Process (List a) a
+    emitAll [] = flattened
+    emitAll (output :: rest) = Yield output (emitAll rest)
+
+||| Keep only the final input value.
+public export
+final : Process a a
+final = Await Input finish Stop
+  where
+    finish : a → Process a a
+    finish value = Await Input finish (Yield value Stop)
+
+||| Keep only the final input value, or emit a default when input is empty.
+public export
+finalOr : a → Process a a
+finalOr fallback = finish fallback
+  where
+    finish : a → Process a a
+    finish value = Await Input finish (Yield value Stop)

@@ -1,0 +1,29 @@
+module Data.Machine.Source
+
+import Data.Machine.Core
+
+%default partial
+
+||| Emit a finite list without ever requesting input.
+public export
+source : List o → Machine k o
+source [] = Stop
+source (output :: rest) = Yield output (source rest)
+
+||| Repeat a non-empty list forever. The empty source stays stopped.
+public export
+cycled : List o → Machine k o
+cycled [] = Stop
+cycled outputs = loop outputs
+  where
+    loop : List o → Machine k o
+    loop [] = loop outputs
+    loop (output :: rest) = Yield output (loop rest)
+
+||| Build a source from an ordinary state transition.
+public export
+unfold : (state → Maybe (o, state)) → state → Machine k o
+unfold step state =
+  case step state of
+    Nothing => Stop
+    Just (output, next) => Yield output (unfold step next)

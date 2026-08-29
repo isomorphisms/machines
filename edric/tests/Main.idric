@@ -1,0 +1,48 @@
+module Main
+
+import Data.Machine
+import System
+
+%default partial
+
+check : (Eq a, Show a) ⇒ String → a → a → IO Bool
+check name expected actual =
+  if expected == actual
+     then do
+       putStrLn ("ok: " ++ name)
+       pure True
+     else do
+       putStrLn ("FAIL: " ++ name)
+       putStrLn ("  expected " ++ show expected)
+       putStrLn ("  actual   " ++ show actual)
+       pure False
+
+pipelineExample : List Nat
+pipelineExample =
+  collect (source [1, 2, 3] ~> taking 2 ~> mapping (\x => x + 1))
+
+bufferExample : List (List Nat)
+bufferExample =
+  collect (source [1, 2, 3, 4, 5] ~> buffered 3)
+
+scanExample : List Nat
+scanExample =
+  collect (source [1, 2, 3, 4, 5] ~> scan (+) 0)
+
+foldExample : List Nat
+foldExample =
+  collect (source [1, 2, 3, 4, 5] ~> fold (+) 0)
+
+teeExample : List (Nat, String)
+teeExample = runTee [1, 2] ["a", "b", "c"] tee
+
+main : IO ()
+main = do
+  pipelineOk ← check "source/taking/mapping" [2, 3] pipelineExample
+  bufferOk ← check "buffered final short chunk" [[1, 2, 3], [4, 5]] bufferExample
+  scanOk ← check "scan emits seed" [0, 1, 3, 6, 10, 15] scanExample
+  foldOk ← check "fold emits final state" [15] foldExample
+  teeOk ← check "typed two-input tee" [(1, "a"), (2, "b")] teeExample
+  if pipelineOk && bufferOk && scanOk && foldOk && teeOk
+     then putStrLn "all Edric machine checks passed"
+     else exitFailure

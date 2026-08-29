@@ -1,0 +1,44 @@
+module Data.Machine.Tee
+
+import Data.Machine.Core
+
+%default partial
+
+||| Typed request family for a two-input machine.
+public export
+data T : Type → Type → Type → Type where
+  L : T a b a
+  R : T a b b
+
+public export
+Tee : Type → Type → Type → Type
+Tee a b output = Machine (T a b) output
+
+public export
+left : Machine (T a b) a
+left = Await L (\value => Yield value Stop) Stop
+
+public export
+right : Machine (T a b) b
+right = Await R (\value => Yield value Stop) Stop
+
+||| Repeatedly request one left value and one right value and emit a pair.
+public export
+tee : Tee a b (a, b)
+tee = Await L
+            (\leftValue => Await R
+                                (\rightValue => Yield (leftValue, rightValue) tee)
+                                Stop)
+            Stop
+
+||| Pure runner for the two-input request family.
+public export
+runTee : List a → List b → Tee a b output → List output
+runTee lefts rights Stop = []
+runTee lefts rights (Yield output rest) = output :: runTee lefts rights rest
+runTee [] rights (Await L receive starved) = runTee [] rights starved
+runTee (leftValue :: lefts) rights (Await L receive starved) =
+  runTee lefts rights (receive leftValue)
+runTee lefts [] (Await R receive starved) = runTee lefts [] starved
+runTee lefts (rightValue :: rights) (Await R receive starved) =
+  runTee lefts rights (receive rightValue)

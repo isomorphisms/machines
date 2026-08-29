@@ -1,0 +1,91 @@
+module Data.Machine.Core
+
+%default partial
+
+||| A demand-driven machine. `k` describes the kinds of input requests the
+||| machine may make; `o` is its output type.
+public export
+data Machine : (Type → Type) → Type → Type where
+  Stop : Machine k o
+  Yield : o → Lazy (Machine k o) → Machine k o
+  Await : {i : Type} →
+          k i →
+          (i → Machine k o) →
+          Lazy (Machine k o) →
+          Machine k o
+
+||| Direct, uncpsed form of Kmett's PlanT semantics.
+public export
+data Plan : (Type → Type) → Type → Type → Type where
+  Done : a → Plan k o a
+  Emit : o → Lazy (Plan k o a) → Plan k o a
+  Need : {i : Type} →
+         k i →
+         (i → Plan k o a) →
+         Lazy (Plan k o a) →
+         Plan k o a
+  Fail : Plan k o a
+
+public export
+stop : Plan k o a
+stop = Fail
+
+public export
+await : k i → Plan k o i
+await request = Need request Done Fail
+
+public export
+yield : o → Plan k o ()
+yield output = Emit output (Done ())
+
+||| Explicit Plan bind. Kept as a named operation rather than hiding the
+||| machine semantics behind typeclass plumbing in the first port.
+public export
+planBind : Plan k o a → (a → Plan k o b) → Plan k o b
+planBind (Done value) next = next value
+planBind (Emit output rest) next = Emit output (planBind rest next)
+planBind (Need request receive starved) next =
+  Need request
+       (\input => planBind (receive input) next)
+       (planBind starved next)
+planBind Fail next = Fail
+
+||| Turn one finite plan into a machine. Completion and failure both stop.
+public export
+construct : Plan k o a → Machine k o
+construct (Done _) = Stop
+construct (Emit output rest) = Yield output (construct rest)
+construct (Need request receive starved) =
+  Await request
+        (\input => construct (receive input))
+        (construct starved)
+construct Fail = Stop
+
+||| Restart a plan whenever it completes normally.
+public export
+repeatedly : Plan k o a → Machine k o
+repeatedly plan = loop plan
+  where
+    loop : Plan k o a → Machine k o
+    loop (Done _) = loop plan
+    loop (Emit output rest) = Yield output (loop rest)
+    loop (Need request receive starved) =
+      Await request
+            (\input => loop (receive input))
+            (loop starved)
+    loop Fail = Stop
+
+public export
+stopped : Machine k o
+stopped = Stop
+
+public export
+emit : o → Machine k o
+emit output = Yield output Stop
+
+||| Collect all outputs while treating every unanswered request as starvation.
+public export
+collect : Machine k o → List o
+collect Stop = []
+collect (Yield output rest) = output :: collect rest
+collect (Await _ _ starved) = collect starved
