@@ -12,6 +12,7 @@ jobs:
     env:
       IDRIS2_CG: chez
       SCHEME: scheme
+      IDRIS2_PATH: ${{ github.workspace }}/Idric/libs/prelude/build/ttc:${{ github.workspace }}/Idric/libs/base/build/ttc:${{ github.workspace }}/Idric/libs/linear/build/ttc:${{ github.workspace }}/Idric/libs/network/build/ttc:${{ github.workspace }}/Idric/libs/contrib/build/ttc:${{ github.workspace }}/Idric/libs/test/build/ttc
     steps:
       - name: Checkout machines
         uses: actions/checkout@v4
