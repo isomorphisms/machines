@@ -36,7 +36,9 @@ jobs:
 
       - name: Compile machines Edric regression program
         working-directory: machines
-        run: ../Idric/build/exec/idris2 --source-dir edric/src edric/tests/Main.idric -o machines-edric
+        run: |
+          cp edric/tests/Main.idric edric/src/Main.idric
+          ../Idric/build/exec/idris2 --source-dir edric/src edric/src/Main.idric -o machines-edric
 
       - name: Run machines Edric regression program
         working-directory: machines
