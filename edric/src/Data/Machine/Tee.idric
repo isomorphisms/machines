@@ -1,10 +1,11 @@
 module Data.Machine.Tee
 
 import Data.Machine.Core
+import Data.Machine.Process
 
 %default partial
 
-||| Typed request family for a two-input machine.
+||| Typed request family for a deterministic two-input machine.
 public export
 data T : Type → Type → Type → Type where
   L : T a b a
@@ -14,24 +15,61 @@ public export
 Tee : Type → Type → Type → Type
 Tee a b output = Machine (T a b) output
 
+||| Precompose one Process onto each input of a Tee.
+||| This is the pure specialization of Kmett's `tee`.
 public export
-left : Machine (T a b) a
-left = Await L (\value ⇒ Yield value Stop) Stop
+tee : Process a a1 → Process b b1 → Tee a1 b1 output → Tee a b output
+tee leftProcess rightProcess Stop = Stop
+tee leftProcess rightProcess (Yield output rest) =
+  Yield output (tee leftProcess rightProcess rest)
+tee leftProcess rightProcess (Await L receive starved) =
+  case leftProcess of
+    Stop ⇒ tee Stop rightProcess starved
+    Yield leftValue rest ⇒ tee rest rightProcess (receive leftValue)
+    Await Input receiveLeft starvedLeft ⇒
+      Await L
+            (\input ⇒ tee (receiveLeft input)
+                          rightProcess
+                          (Await L receive starved))
+            (tee starvedLeft rightProcess (Await L receive starved))
+tee leftProcess rightProcess (Await R receive starved) =
+  case rightProcess of
+    Stop ⇒ tee leftProcess Stop starved
+    Yield rightValue rest ⇒ tee leftProcess rest (receive rightValue)
+    Await Input receiveRight starvedRight ⇒
+      Await R
+            (\input ⇒ tee leftProcess
+                          (receiveRight input)
+                          (Await R receive starved))
+            (tee leftProcess starvedRight (Await R receive starved))
 
 public export
-right : Machine (T a b) b
-right = Await R (\value ⇒ Yield value Stop) Stop
+addL : Process a b → Tee b c output → Tee a c output
+addL process = tee process echo
 
-||| Repeatedly request one left value and one right value and emit a pair.
 public export
-tee : Tee a b (a, b)
-tee = Await L
-            (\leftValue ⇒ Await R
-                                (\rightValue ⇒ Yield (leftValue, rightValue) tee)
-                                Stop)
-            Stop
+addR : Process b c → Tee a c output → Tee a b output
+addR process = tee echo process
 
-||| Pure runner for the two-input request family.
+||| One left request followed by one right request and one combined output.
+public export
+zipWithT : (a → b → c) → Plan (T a b) c ()
+zipWithT combine =
+  planBind (await L) (\leftValue ⇒
+    planBind (await R) (\rightValue ⇒
+      yield (combine leftValue rightValue)))
+
+||| Zip the two inputs, stopping when either input starves.
+public export
+zipWith : (a → b → c) → Tee a b c
+zipWith combine = repeatedly (zipWithT combine)
+
+public export
+zipping : Tee a b (a, b)
+zipping = zipWith (\leftValue, rightValue ⇒ (leftValue, rightValue))
+
+||| Pure runner for the two-input request family. This helper is specific to the
+||| Edric port and makes typed Tee behavior easy to regression-test.
 public export
 runTee : List a → List b → Tee a b output → List output
 runTee lefts rights Stop = []
