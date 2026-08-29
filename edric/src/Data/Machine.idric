@@ -5,3 +5,5 @@ import public Data.Machine.Is
 import public Data.Machine.Process
 import public Data.Machine.Source
 import public Data.Machine.Tee
+import public Data.Machine.Mealy
+import public Data.Machine.Moore

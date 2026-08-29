@@ -1,0 +1,52 @@
+module Data.Machine.Moore
+
+import Data.Machine.Process
+
+%default partial
+
+||| A Moore machine has a current output and changes state when fed an input.
+public export
+data Moore : Type → Type → Type where
+  MkMoore : b → (a → Lazy (Moore a b)) → Moore a b
+
+public export
+output : Moore a b → b
+output (MkMoore value _) = value
+
+public export
+stepMoore : Moore a b → a → Moore a b
+stepMoore (MkMoore _ next) input = next input
+
+||| Construct a Moore machine from a state valuation plus transition family.
+public export
+unfoldMoore : (state → (b, a → state)) → state → Moore a b
+unfoldMoore describe state =
+  case describe state of
+    (value, transition) =>
+      MkMoore value (\input => unfoldMoore describe (transition input))
+
+public export
+mapMoore : (b → c) → Moore a b → Moore a c
+mapMoore transform (MkMoore value next) =
+  MkMoore (transform value)
+          (\input => mapMoore transform (next input))
+
+public export
+lmapMoore : (a → b) → Moore b c → Moore a c
+lmapMoore transform (MkMoore value next) =
+  MkMoore value
+          (\input => lmapMoore transform (next (transform input)))
+
+public export
+dimapMoore : (a → b) → (c → d) → Moore b c → Moore a d
+dimapMoore before after machine = mapMoore after (lmapMoore before machine)
+
+||| Lift a Moore machine into Process. Its current output is emitted before it
+||| asks for the next input, matching machines' Haskell Automaton instance.
+public export
+autoMoore : Moore a b → Process a b
+autoMoore (MkMoore value next) =
+  Yield value
+        (Await Input
+               (\input => autoMoore (next input))
+               Stop)

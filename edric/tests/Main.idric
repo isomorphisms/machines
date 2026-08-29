@@ -36,6 +36,22 @@ foldExample =
 teeExample : List (Nat, String)
 teeExample = runTee [1, 2] ["a", "b", "c"] tee
 
+countingMealy : Mealy Char (Nat, Char)
+countingMealy =
+  unfoldMealy (\index, char => ((index, char), S index)) 0
+
+mealyExample : List (Nat, Char)
+mealyExample =
+  collect (source ['w', 'o', 'r', 'd'] ~> autoMealy countingMealy)
+
+runningTotalMoore : Moore Nat Nat
+runningTotalMoore =
+  unfoldMoore (\total => (total, \input => total + input)) 0
+
+mooreExample : List Nat
+mooreExample =
+  collect (source [1, 2, 3] ~> autoMoore runningTotalMoore)
+
 main : IO ()
 main = do
   pipelineOk ← check "source/taking/mapping" [2, 3] pipelineExample
@@ -43,6 +59,10 @@ main = do
   scanOk ← check "scan emits seed" [0, 1, 3, 6, 10, 15] scanExample
   foldOk ← check "fold emits final state" [15] foldExample
   teeOk ← check "typed two-input tee" [(1, "a"), (2, "b")] teeExample
-  if pipelineOk && bufferOk && scanOk && foldOk && teeOk
+  mealyOk ← check "Mealy counting example"
+                  [(0, 'w'), (1, 'o'), (2, 'r'), (3, 'd')]
+                  mealyExample
+  mooreOk ← check "Moore running total" [0, 1, 3, 6] mooreExample
+  if pipelineOk && bufferOk && scanOk && foldOk && teeOk && mealyOk && mooreOk
      then putStrLn "all Edric machine checks passed"
      else exitFailure

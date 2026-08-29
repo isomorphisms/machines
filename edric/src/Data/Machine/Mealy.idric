@@ -1,0 +1,64 @@
+module Data.Machine.Mealy
+
+import Data.Machine.Process
+
+%default partial
+
+||| A Mealy machine emits one output for each input and carries a continuation.
+||| The continuation is explicit Lazy because Idris is strict by default.
+public export
+data Mealy : Type → Type → Type where
+  MkMealy : (a → (b, Lazy (Mealy a b))) → Mealy a b
+
+public export
+runMealy : Mealy a b → a → (b, Lazy (Mealy a b))
+runMealy (MkMealy step) input = step input
+
+||| Construct a Mealy machine from an explicit state transition.
+public export
+unfoldMealy : (state → a → (b, state)) → state → Mealy a b
+unfoldMealy transition state =
+  MkMealy (\input =>
+    case transition state input of
+      (output, next) => (output, unfoldMealy transition next))
+
+public export
+mapMealy : (b → c) → Mealy a b → Mealy a c
+mapMealy transform machine =
+  MkMealy (\input =>
+    case runMealy machine input of
+      (output, next) => (transform output, mapMealy transform next))
+
+public export
+lmapMealy : (a → b) → Mealy b c → Mealy a c
+lmapMealy transform machine =
+  MkMealy (\input =>
+    case runMealy machine (transform input) of
+      (output, next) => (output, lmapMealy transform next))
+
+public export
+dimapMealy : (a → b) → (c → d) → Mealy b c → Mealy a d
+dimapMealy before after machine = mapMealy after (lmapMealy before machine)
+
+public export
+idMealy : Mealy a a
+idMealy = MkMealy (\input => (input, idMealy))
+
+public export
+composeMealy : Mealy b c → Mealy a b → Mealy a c
+composeMealy bc ab =
+  MkMealy (\input =>
+    case runMealy ab input of
+      (middle, nextAB) =>
+        case runMealy bc middle of
+          (output, nextBC) => (output, composeMealy nextBC nextAB))
+
+||| Lift a Mealy machine into the ordinary Process representation.
+public export
+autoMealy : Mealy a b → Process a b
+autoMealy machine =
+  Await Input
+        (\input =>
+          case runMealy machine input of
+            (output, next) => Yield output (autoMealy next))
+        Stop
