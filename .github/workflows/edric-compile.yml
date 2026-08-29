@@ -3,7 +3,7 @@ name: Edric compile gate
 on:
   push:
     branches:
-      - edric-compile-gate
+      - edric-compile-next
   workflow_dispatch:
 
 jobs:
