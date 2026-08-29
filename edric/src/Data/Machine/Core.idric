@@ -31,8 +31,8 @@ stop : Plan k o a
 stop = Fail
 
 public export
-await : k i → Plan k o i
-await request = Need request Done Fail
+await : {i : Type} → k i → Plan k o i
+await {i} request = Need request (\input ⇒ Done input) Fail
 
 public export
 yield : o → Plan k o ()
