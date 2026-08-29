@@ -16,18 +16,18 @@ Tee a b output = Machine (T a b) output
 
 public export
 left : Machine (T a b) a
-left = Await L (\value => Yield value Stop) Stop
+left = Await L (\value ⇒ Yield value Stop) Stop
 
 public export
 right : Machine (T a b) b
-right = Await R (\value => Yield value Stop) Stop
+right = Await R (\value ⇒ Yield value Stop) Stop
 
 ||| Repeatedly request one left value and one right value and emit a pair.
 public export
 tee : Tee a b (a, b)
 tee = Await L
-            (\leftValue => Await R
-                                (\rightValue => Yield (leftValue, rightValue) tee)
+            (\leftValue ⇒ Await R
+                                (\rightValue ⇒ Yield (leftValue, rightValue) tee)
                                 Stop)
             Stop
 

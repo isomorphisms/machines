@@ -25,5 +25,5 @@ public export
 unfold : (state → Maybe (o, state)) → state → Machine k o
 unfold step state =
   case step state of
-    Nothing => Stop
-    Just (output, next) => Yield output (unfold step next)
+    Nothing ⇒ Stop
+    Just (output, next) ⇒ Yield output (unfold step next)

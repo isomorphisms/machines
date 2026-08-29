@@ -22,20 +22,20 @@ public export
 unfoldMoore : (state → (b, a → state)) → state → Moore a b
 unfoldMoore describe state =
   case describe state of
-    (value, transition) =>
-      MkMoore value (\input => unfoldMoore describe (transition input))
+    (value, transition) ⇒
+      MkMoore value (\input ⇒ unfoldMoore describe (transition input))
 
 public export
 mapMoore : (b → c) → Moore a b → Moore a c
 mapMoore transform (MkMoore value next) =
   MkMoore (transform value)
-          (\input => mapMoore transform (next input))
+          (\input ⇒ mapMoore transform (next input))
 
 public export
 lmapMoore : (a → b) → Moore b c → Moore a c
 lmapMoore transform (MkMoore value next) =
   MkMoore value
-          (\input => lmapMoore transform (next (transform input)))
+          (\input ⇒ lmapMoore transform (next (transform input)))
 
 public export
 dimapMoore : (a → b) → (c → d) → Moore b c → Moore a d
@@ -48,5 +48,5 @@ autoMoore : Moore a b → Process a b
 autoMoore (MkMoore value next) =
   Yield value
         (Await Input
-               (\input => autoMoore (next input))
+               (\input ⇒ autoMoore (next input))
                Stop)

@@ -46,7 +46,7 @@ planBind (Done value) next = next value
 planBind (Emit output rest) next = Emit output (planBind rest next)
 planBind (Need request receive starved) next =
   Need request
-       (\input => planBind (receive input) next)
+       (\input ⇒ planBind (receive input) next)
        (planBind starved next)
 planBind Fail next = Fail
 
@@ -57,7 +57,7 @@ construct (Done _) = Stop
 construct (Emit output rest) = Yield output (construct rest)
 construct (Need request receive starved) =
   Await request
-        (\input => construct (receive input))
+        (\input ⇒ construct (receive input))
         (construct starved)
 construct Fail = Stop
 
@@ -71,7 +71,7 @@ repeatedly plan = loop plan
     loop (Emit output rest) = Yield output (loop rest)
     loop (Need request receive starved) =
       Await request
-            (\input => loop (receive input))
+            (\input ⇒ loop (receive input))
             (loop starved)
     loop Fail = Stop
 

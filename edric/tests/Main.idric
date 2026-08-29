@@ -19,7 +19,7 @@ check name expected actual =
 
 pipelineExample : List Nat
 pipelineExample =
-  collect (source [1, 2, 3] ~> taking 2 ~> mapping (\x => x + 1))
+  collect (source [1, 2, 3] ~> taking 2 ~> mapping (\x ⇒ x + 1))
 
 bufferExample : List (List Nat)
 bufferExample =
@@ -38,7 +38,7 @@ teeExample = runTee [1, 2] ["a", "b", "c"] tee
 
 countingMealy : Mealy Char (Nat, Char)
 countingMealy =
-  unfoldMealy (\index, char => ((index, char), S index)) 0
+  unfoldMealy (\index, char ⇒ ((index, char), S index)) 0
 
 mealyExample : List (Nat, Char)
 mealyExample =
@@ -46,7 +46,7 @@ mealyExample =
 
 runningTotalMoore : Moore Nat Nat
 runningTotalMoore =
-  unfoldMoore (\total => (total, \input => total + input)) 0
+  unfoldMoore (\total ⇒ (total, \input ⇒ total + input)) 0
 
 mooreExample : List Nat
 mooreExample =

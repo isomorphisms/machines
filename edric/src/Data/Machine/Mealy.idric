@@ -18,23 +18,23 @@ runMealy (MkMealy step) input = step input
 public export
 unfoldMealy : (state → a → (b, state)) → state → Mealy a b
 unfoldMealy transition state =
-  MkMealy (\input =>
+  MkMealy (\input ⇒
     case transition state input of
-      (output, next) => (output, unfoldMealy transition next))
+      (output, next) ⇒ (output, unfoldMealy transition next))
 
 public export
 mapMealy : (b → c) → Mealy a b → Mealy a c
 mapMealy transform machine =
-  MkMealy (\input =>
+  MkMealy (\input ⇒
     case runMealy machine input of
-      (output, next) => (transform output, mapMealy transform next))
+      (output, next) ⇒ (transform output, mapMealy transform next))
 
 public export
 lmapMealy : (a → b) → Mealy b c → Mealy a c
 lmapMealy transform machine =
-  MkMealy (\input =>
+  MkMealy (\input ⇒
     case runMealy machine (transform input) of
-      (output, next) => (output, lmapMealy transform next))
+      (output, next) ⇒ (output, lmapMealy transform next))
 
 public export
 dimapMealy : (a → b) → (c → d) → Mealy b c → Mealy a d
@@ -42,23 +42,23 @@ dimapMealy before after machine = mapMealy after (lmapMealy before machine)
 
 public export
 idMealy : Mealy a a
-idMealy = MkMealy (\input => (input, idMealy))
+idMealy = MkMealy (\input ⇒ (input, idMealy))
 
 public export
 composeMealy : Mealy b c → Mealy a b → Mealy a c
 composeMealy bc ab =
-  MkMealy (\input =>
+  MkMealy (\input ⇒
     case runMealy ab input of
-      (middle, nextAB) =>
+      (middle, nextAB) ⇒
         case runMealy bc middle of
-          (output, nextBC) => (output, composeMealy nextBC nextAB))
+          (output, nextBC) ⇒ (output, composeMealy nextBC nextAB))
 
 ||| Lift a Mealy machine into the ordinary Process representation.
 public export
 autoMealy : Mealy a b → Process a b
 autoMealy machine =
   Await Input
-        (\input =>
+        (\input ⇒
           case runMealy machine input of
-            (output, next) => Yield output (autoMealy next))
+            (output, next) ⇒ Yield output (autoMealy next))
         Stop
